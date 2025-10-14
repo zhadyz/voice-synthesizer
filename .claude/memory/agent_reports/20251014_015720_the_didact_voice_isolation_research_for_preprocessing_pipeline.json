@@ -1,0 +1,100 @@
+{
+  "task": "Voice Isolation Research for Preprocessing Pipeline",
+  "status": "COMPLETED",
+  "confidence": "HIGH",
+  "summary": {
+    "recommended_model": "BS-RoFormer (Primary) + Demucs htdemucs (Fallback)",
+    "quality": "BS-RoFormer: 12.9 dB SDR (vocals), htdemucs: 10.8 dB SDR (vocals)",
+    "vram_requirement": "3-7GB VRAM (fits RTX 3070 8GB)",
+    "integration_complexity": "EASY - Python audio-separator package provides unified API",
+    "processing_speed": "< 30 seconds per 3-4 minute song on RTX 3070",
+    "key_findings": [
+      "BS-RoFormer is SOTA for vocal separation (12.9 dB SDR vs 10.8 dB for htdemucs)",
+      "audio-separator Python package provides unified API for UVR models (MDX-Net, Demucs, BS-RoFormer)",
+      "Demucs works in time-domain = natural phase handling = fewer artifacts",
+      "MDX algorithms best for vocals specifically, Demucs better for full 4-stem separation",
+      "Voice cloning requires SNR > 20-25 dB for high quality training data",
+      "Facebook Denoiser excellent for speech-specific noise reduction (runs real-time on CPU)",
+      "PyAnnote speaker-diarization-3.1 available for multi-speaker scenarios"
+    ],
+    "opportunities": [
+      "Dual-stage preprocessing: (1) BS-RoFormer vocal isolation, (2) Facebook Denoiser speech enhancement",
+      "audio-separator package simplifies integration - single API for multiple models",
+      "Cascade approach: Demucs for music removal, then Denoiser for residual noise",
+      "Quality validation pipeline using SNR metrics (reject < 20 dB)",
+      "Speaker diarization enables target speaker extraction from multi-speaker audio",
+      "Memory optimization: 3GB VRAM mode for concurrent training/preprocessing"
+    ],
+    "competitors": [
+      "ElevenLabs: Voice Isolator removes background noise and reverb (proprietary)",
+      "Descript Studio Sound: Text-based editing + filler word removal (proprietary)",
+      "Adobe Podcast Enhance: AI voice isolation, noise reduction, frequency equalization (cloud-based)",
+      "All use similar underlying techniques: DNN-based source separation + speech enhancement",
+      "Our offline solution competitive: BS-RoFormer + Denoiser matches commercial quality"
+    ],
+    "recommendations": [
+      "PRIMARY: Implement audio-separator package with BS-RoFormer model (model_bs_roformer_ep_317_sdr_12.9755.ckpt)",
+      "FALLBACK: htdemucs for full 4-stem separation or when BS-RoFormer struggles",
+      "SPEECH ENHANCEMENT: Add Facebook Denoiser as second-stage processor for speech-specific noise",
+      "MULTI-SPEAKER: Integrate PyAnnote speaker-diarization-3.1 for target speaker extraction",
+      "PREPROCESSING ORDER: (1) Voice Isolation (BS-RoFormer), (2) VAD (Silero), (3) Speech Enhancement (Denoiser), (4) SNR Validation (> 20 dB)",
+      "MEMORY MANAGEMENT: Use --segment 8 flag to reduce VRAM to 3GB if needed during concurrent operations",
+      "QUALITY METRICS: Implement SNR calculation, reject training data < 20 dB SNR",
+      "USER WORKFLOW: Automatic preprocessing with manual override, show before/after waveforms"
+    ],
+    "technical_specs": {
+      "bs_roformer": {
+        "sdr_vocals": "12.9 dB",
+        "vram": "3-7GB (adjustable)",
+        "speed": "< 30s per 3-4min song (RTX 3070)",
+        "artifacts": "Minimal - SOTA quality",
+        "integration": "audio-separator package",
+        "install": "pip install audio-separator"
+      },
+      "htdemucs": {
+        "sdr_vocals": "10.8 dB",
+        "vram": "3GB min (--segment 8), 7GB default",
+        "speed": "< 6min per 6min song (CPU: 2GHz i5)",
+        "artifacts": "Low - time-domain processing handles phase naturally",
+        "integration": "demucs package or audio-separator",
+        "install": "pip install demucs"
+      },
+      "facebook_denoiser": {
+        "use_case": "Speech-specific noise reduction",
+        "vram": "CPU capable - real-time on laptop",
+        "speed": "Real-time processing",
+        "artifacts": "Minimal for speech",
+        "integration": "denoiser package",
+        "install": "pip install denoiser"
+      },
+      "pyannote_diarization": {
+        "use_case": "Multi-speaker separation",
+        "vram": "Modest GPU (pure PyTorch)",
+        "speed": "Near real-time",
+        "accuracy": "SOTA speaker identification",
+        "integration": "pyannote.audio",
+        "install": "pip install pyannote.audio"
+      }
+    },
+    "challenges": [
+      "GPU memory contention: Voice isolation + RVC training both need VRAM (solution: sequential processing or reduce segment size)",
+      "Processing time: High-quality separation takes 30s-6min per audio file (solution: background processing with progress bar)",
+      "Model downloads: First run downloads large models (solution: pre-package models or show download progress)",
+      "Edge cases: Heavily processed audio (autotune, heavy reverb) may produce artifacts (solution: provide manual quality check)",
+      "Multi-speaker complexity: Requires speaker diarization + per-speaker extraction (solution: PyAnnote integration)",
+      "Quality validation: Need automatic SNR calculation to reject poor separations (solution: implement SNR metrics)",
+      "Phase artifacts: Frequency-domain models can introduce phase issues (solution: prefer time-domain models like Demucs)"
+    ],
+    "implementation_roadmap": [
+      "Phase 1: Install audio-separator, test BS-RoFormer on sample audio (1-2 hours)",
+      "Phase 2: Build preprocessing pipeline: isolation -> VAD -> enhancement (2-4 hours)",
+      "Phase 3: Implement SNR validation and quality metrics (2-3 hours)",
+      "Phase 4: Add speaker diarization for multi-speaker scenarios (3-4 hours)",
+      "Phase 5: Build user interface with preview, manual override, progress tracking (4-6 hours)",
+      "Total: 12-19 hours for complete voice isolation system"
+    ]
+  },
+  "agent": "the_didact",
+  "timestamp": "2025-10-14T01:57:20.854161",
+  "report_id": "20251014_015720_the_didact_voice_isolation_research_for_preprocessing_pipeline.json"
+}

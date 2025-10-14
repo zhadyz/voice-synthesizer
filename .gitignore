@@ -1,0 +1,176 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+venv_py311/
+
+# PyTorch
+*.pth
+*.pt
+checkpoints/
+logs/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+voice_cloning.db
+
+# Redis
+dump.rdb
+
+# Audio files (temporary/processed)
+uploads/
+outputs/
+test_audio/
+*.wav
+*.mp3
+*.m4a
+*.flac
+!tests/fixtures/*.wav
+!tests/fixtures/*.mp3
+
+# Model files (large)
+pretrained/
+trained_models/
+*.ckpt
+*.safetensors
+models/hubert/
+models/rmvpe/
+Retrieval-based-Voice-Conversion-WebUI/logs/
+Retrieval-based-Voice-Conversion-WebUI/weights/
+
+# Cache
+.cache/
+*.log
+pipeline.log
+
+# Node.js (Frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Frontend build
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+test_output/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# OS specific
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Documentation builds
+docs/_build/
+site/
+
+# Large model downloads
+*.tar.gz
+*.zip
+models/
+.audio-separator/
+
+# Redis dump
+appendonly.aof
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Ignore all test output
+test_isolated.wav
+isolation_test_*.wav
+clean_test.wav
+quality_test.wav
+converted_test.wav
+
+# Secrets and credentials
+secrets/
+credentials/
+*.key
+*.pem
+*.crt
+
+# Backup files
+*.bak
+*.backup
+*_backup.*
+
+# Production config
+config/production.yml
+docker-compose.override.yml
