@@ -66,7 +66,7 @@ This is a research and development project exploring offline voice synthesis. Us
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/voice-synthesizer.git
+   git clone https://github.com/zhadyz/voice-synthesizer.git
    cd voice-synthesizer
    ```
 
@@ -125,10 +125,8 @@ This is a research and development project exploring offline voice synthesis. Us
 
 ## 📖 Documentation
 
-- **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
 - **[API Documentation](backend/README.md)** - Backend API reference
 - **[Frontend Guide](frontend/README.md)** - Frontend architecture and components
-- **[ML Pipeline](PHASE_2_CORE_PIPELINE.md)** - Deep dive into the ML components
 - **[Deployment Guide](backend/DEPLOYMENT_CHECKLIST.md)** - Production deployment instructions
 
 ## 🎮 Usage
@@ -261,7 +259,6 @@ pytest tests/test_performance_benchmarks.py -v
 - [ ] Multi-speaker diarization
 - [ ] Mobile app (iOS/Android)
 
-See [PHASE_5_S_PLUS_OPTIMIZATION.md](PHASE_5_S_PLUS_OPTIMIZATION.md) for detailed optimization roadmap.
 
 ## ⚠️ Known Issues
 
@@ -271,7 +268,7 @@ See [PHASE_5_S_PLUS_OPTIMIZATION.md](PHASE_5_S_PLUS_OPTIMIZATION.md) for detaile
 - **Training:** Cannot be interrupted/resumed (must complete fully)
 - **Multi-user:** Single-user only (no concurrent training)
 
-See [Issues](https://github.com/yourusername/voice-synthesizer/issues) for full list.
+See [Issues](https://github.com/zhadyz/voice-synthesizer/issues) for full list.
 
 ## 🤝 Contributing
 
@@ -300,9 +297,9 @@ This project builds on the work of many open-source projects:
 
 ## 📧 Contact
 
-- **Author:** [Your Name]
-- **GitHub:** [@yourusername](https://github.com/yourusername)
-- **Issues:** [GitHub Issues](https://github.com/yourusername/voice-synthesizer/issues)
+- **Author:** Bari (zhadyz)
+- **GitHub:** [@zhadyz](https://github.com/zhadyz)
+- **Issues:** [GitHub Issues](https://github.com/zhadyz/voice-synthesizer/issues)
 
 ## ⚖️ Disclaimer
 
@@ -323,9 +320,9 @@ If you use this project in your research, please cite:
 ```bibtex
 @software{voice_synthesizer_2025,
   title = {Voice Synthesizer: Open-Source Offline Voice Cloning},
-  author = {Your Name},
+  author = {Bari (zhadyz)},
   year = {2025},
-  url = {https://github.com/yourusername/voice-synthesizer}
+  url = {https://github.com/zhadyz/voice-synthesizer}
 }
 ```
 
