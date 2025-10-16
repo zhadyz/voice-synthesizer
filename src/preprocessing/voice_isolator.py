@@ -78,6 +78,32 @@ class VoiceIsolator:
         logger.info(f"Vocals isolated: {vocals_path_str}")
         return vocals_path_str
 
+    def batch_isolate_vocals(self, audio_paths: list) -> list:
+        """
+        Extract vocals from multiple audio files in batch
+
+        Args:
+            audio_paths: List of paths to input audio files
+
+        Returns:
+            List of paths to isolated vocals files
+        """
+        logger.info(f"Batch isolating vocals from {len(audio_paths)} files")
+        results = []
+
+        for i, audio_path in enumerate(audio_paths):
+            try:
+                logger.info(f"Processing {i+1}/{len(audio_paths)}: {audio_path}")
+                vocals_path = self.isolate_vocals(audio_path)
+                results.append(vocals_path)
+            except Exception as e:
+                logger.error(f"Failed to isolate vocals from {audio_path}: {e}")
+                results.append(None)
+
+        success_count = sum(1 for r in results if r is not None)
+        logger.info(f"Batch isolation complete: {success_count}/{len(audio_paths)} succeeded")
+        return results
+
     def cleanup(self):
         """Clean up GPU memory"""
         if hasattr(self, 'separator'):

@@ -3,13 +3,17 @@ Voice Cloning API - FastAPI Backend
 Main application with routing and middleware
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
 import torch
 import sys
+import os
+import logging
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -18,6 +22,15 @@ sys.path.append(str(project_root))
 from backend.database import init_db, engine
 from backend.routers import upload, jobs, stream, download, models
 from backend.schemas import HealthResponse
+from backend.config import settings
+from backend.auth import verify_api_key, get_optional_api_key
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -68,11 +81,14 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle uncaught exceptions"""
+    # SECURITY: Log full error internally but return generic message
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "detail": str(exc),
+            "detail": "An unexpected error occurred. Please try again later.",
             "path": str(request.url)
         }
     )

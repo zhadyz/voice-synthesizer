@@ -1,45 +1,51 @@
 import React from 'react';
 
 export function ProgressBar({ progress, status, message }) {
-  const getStatusColor = () => {
+  const getStatusGradient = () => {
     switch (status) {
       case 'preprocessing':
       case 'pending':
-        return 'bg-blue-500';
+        return 'from-accent-500 to-accent-600';
       case 'training':
       case 'processing':
-        return 'bg-purple-500';
+        return 'from-accent-500 to-accent-600';
       case 'converting':
-        return 'bg-green-500';
+        return 'from-accent-500 to-accent-600';
       case 'completed':
-        return 'bg-green-600';
+        return 'from-green-500 to-green-600';
       case 'failed':
-        return 'bg-red-500';
+        return 'from-red-500 to-red-600';
       default:
-        return 'bg-gray-500';
+        return 'from-gray-500 to-gray-600';
     }
   };
 
   return (
     <div className="w-full">
-      <div className="flex justify-between mb-2">
-        <span className="text-sm font-medium text-gray-700 capitalize">
+      <div className="flex justify-between mb-3">
+        <span className="text-base font-semibold text-gray-900 capitalize">
           {status || 'Processing'}
         </span>
-        <span className="text-sm font-medium text-gray-700">
+        <span className="text-base font-semibold text-gray-900">
           {Math.round(progress)}%
         </span>
       </div>
 
-      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+      <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 ${getStatusColor()}`}
+          className={`absolute inset-y-0 left-0 bg-gradient-to-r ${getStatusGradient()} rounded-full transition-all duration-300 ease-out`}
           style={{ width: `${progress}%` }}
-        />
+        >
+          {/* Shimmer overlay */}
+          <div
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"
+            style={{ backgroundSize: '1000px 100%' }}
+          />
+        </div>
       </div>
 
       {message && (
-        <p className="text-xs text-gray-500 mt-2">{message}</p>
+        <p className="text-sm text-gray-600 mt-3">{message}</p>
       )}
     </div>
   );

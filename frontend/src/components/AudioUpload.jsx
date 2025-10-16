@@ -19,33 +19,40 @@ export function AudioUpload({ onUpload, accept = '.mp3,.wav,.m4a,.flac', label }
     <div
       {...getRootProps()}
       className={`
-        border-2 border-dashed rounded-lg p-12 text-center cursor-pointer
-        transition-colors duration-200
-        ${isDragActive ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-primary'}
+        border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer
+        transition-all duration-300 group
+        ${isDragActive
+          ? 'border-accent-500 bg-accent-500/10 scale-[1.02] shadow-elevated'
+          : 'border-gray-300 hover:border-accent-500 hover:bg-accent-500/5 hover:shadow-elevated hover:scale-[1.01]'
+        }
       `}
     >
       <input {...getInputProps()} />
-      <svg
-        className="w-16 h-16 mx-auto text-gray-400 mb-4"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-        />
-      </svg>
-      <p className="text-lg font-medium text-gray-700">
+      <div className={`transition-all duration-300 ${isDragActive ? 'scale-110' : 'group-hover:scale-105'}`}>
+        <svg
+          className={`w-20 h-20 mx-auto mb-6 transition-colors duration-300 ${
+            isDragActive ? 'text-accent-500' : 'text-gray-400 group-hover:text-accent-500'
+          }`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={1.5}
+            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+          />
+        </svg>
+      </div>
+      <p className="text-xl font-semibold text-gray-900 mb-2">
         {label || 'Upload Audio File'}
       </p>
-      <p className="text-sm text-gray-500 mt-2">
+      <p className="text-base text-gray-600 mb-1">
         Drag & drop or click to select
       </p>
-      <p className="text-xs text-gray-400 mt-1">
+      <p className="text-sm text-gray-500">
         MP3, WAV, M4A, FLAC (max 100MB)
       </p>
     </div>

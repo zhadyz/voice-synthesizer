@@ -3,17 +3,22 @@ File Upload Endpoints
 Handles training audio and target audio uploads
 """
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Form, Request
 from sqlalchemy.orm import Session
 import uuid
 import os
+import re
 from pathlib import Path
 from datetime import datetime
 import librosa
+import logging
 
 from backend.database import get_db
 from backend.models import Job, JobStatus
 from backend.schemas import UploadResponse
+from backend.auth import verify_api_key
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/upload", tags=["upload"])
 
@@ -27,9 +32,34 @@ MAX_FILE_SIZE_MB = 100
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
-def validate_audio_file(filename: str, file_size: int) -> None:
-    """Validate audio file extension and size"""
-    ext = Path(filename).suffix.lower()
+def sanitize_filename(filename: str) -> tuple[str, str]:
+    """
+    Sanitize filename to prevent path traversal attacks
+
+    Returns:
+        tuple: (sanitized_filename, file_extension)
+    """
+    # Get basename to strip any directory components
+    filename = os.path.basename(filename)
+
+    # Remove dangerous characters and path traversal patterns
+    filename = re.sub(r'[^\w\s.-]', '_', filename)
+    filename = filename.replace('..', '_')
+
+    # Extract extension
+    file_ext = Path(filename).suffix.lower()
+
+    return filename, file_ext
+
+
+def validate_audio_file(filename: str, file_size: int) -> str:
+    """
+    Validate audio file extension and size
+
+    Returns:
+        str: Sanitized file extension
+    """
+    _, ext = sanitize_filename(filename)
 
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -39,16 +69,20 @@ def validate_audio_file(filename: str, file_size: int) -> None:
 
     if file_size > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
-            status_code=400,
+            status_code=413,
             detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB"
         )
+
+    return ext
 
 
 @router.post("/training-audio", response_model=UploadResponse)
 async def upload_training_audio(
+    request: Request,
     file: UploadFile = File(...),
     user_id: str = Form(default="default_user"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: str = Depends(verify_api_key)
 ):
     """
     Upload user's voice recording for model training
@@ -58,27 +92,46 @@ async def upload_training_audio(
     - Creates a training job in the database
     """
 
-    # Read file contents
-    contents = await file.read()
-    file_size = len(contents)
+    # SECURITY: Check Content-Length header BEFORE reading file
+    content_length = request.headers.get('content-length')
+    if content_length and int(content_length) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB"
+        )
 
-    # Validate file
-    validate_audio_file(file.filename, file_size)
+    # Validate file extension
+    file_ext = validate_audio_file(file.filename, 0)  # Size checked via header
 
     # Generate unique job ID
     job_id = str(uuid.uuid4())
 
-    # Save file with job ID prefix
-    safe_filename = Path(file.filename).name
-    file_path = UPLOAD_DIR / f"{job_id}_{safe_filename}"
+    # SECURITY: Use UUID-based filename to prevent path traversal
+    safe_filename = f"{job_id}{file_ext}"
+    file_path = UPLOAD_DIR / safe_filename
 
+    # SECURITY: Stream file to disk with size validation
+    bytes_written = 0
     try:
         with open(file_path, "wb") as f:
-            f.write(contents)
+            while chunk := await file.read(8192):  # 8KB chunks
+                bytes_written += len(chunk)
+                if bytes_written > MAX_FILE_SIZE_BYTES:
+                    f.close()
+                    file_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB"
+                    )
+                f.write(chunk)
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"File write failed: {e}")
+        file_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save file: {str(e)}"
+            detail="Failed to save file. Please try again."
         )
 
     # Create job in database
@@ -96,13 +149,14 @@ async def upload_training_audio(
         db.commit()
     except Exception as e:
         # Cleanup file if database fails
+        logger.error(f"Database error: {e}")
         file_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Database error: {str(e)}"
+            detail="Database error. Please try again."
         )
 
-    size_mb = file_size / (1024 * 1024)
+    size_mb = bytes_written / (1024 * 1024)
 
     return UploadResponse(
         job_id=job_id,
@@ -115,9 +169,11 @@ async def upload_training_audio(
 
 @router.post("/target-audio", response_model=UploadResponse)
 async def upload_target_audio(
+    request: Request,
     file: UploadFile = File(...),
     user_id: str = Form(default="default_user"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: str = Depends(verify_api_key)
 ):
     """
     Upload audio to convert to user's voice
@@ -127,27 +183,46 @@ async def upload_target_audio(
     - Creates a conversion job in the database
     """
 
-    # Read file contents
-    contents = await file.read()
-    file_size = len(contents)
+    # SECURITY: Check Content-Length header BEFORE reading file
+    content_length = request.headers.get('content-length')
+    if content_length and int(content_length) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB"
+        )
 
-    # Validate file
-    validate_audio_file(file.filename, file_size)
+    # Validate file extension
+    file_ext = validate_audio_file(file.filename, 0)  # Size checked via header
 
     # Generate unique job ID
     job_id = str(uuid.uuid4())
 
-    # Save file with job ID prefix
-    safe_filename = Path(file.filename).name
-    file_path = UPLOAD_DIR / f"{job_id}_{safe_filename}"
+    # SECURITY: Use UUID-based filename to prevent path traversal
+    safe_filename = f"{job_id}{file_ext}"
+    file_path = UPLOAD_DIR / safe_filename
 
+    # SECURITY: Stream file to disk with size validation
+    bytes_written = 0
     try:
         with open(file_path, "wb") as f:
-            f.write(contents)
+            while chunk := await file.read(8192):  # 8KB chunks
+                bytes_written += len(chunk)
+                if bytes_written > MAX_FILE_SIZE_BYTES:
+                    f.close()
+                    file_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size: {MAX_FILE_SIZE_MB}MB"
+                    )
+                f.write(chunk)
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"File write failed: {e}")
+        file_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save file: {str(e)}"
+            detail="Failed to save file. Please try again."
         )
 
     # Create job in database
@@ -165,13 +240,14 @@ async def upload_target_audio(
         db.commit()
     except Exception as e:
         # Cleanup file if database fails
+        logger.error(f"Database error: {e}")
         file_path.unlink(missing_ok=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Database error: {str(e)}"
+            detail="Database error. Please try again."
         )
 
-    size_mb = file_size / (1024 * 1024)
+    size_mb = bytes_written / (1024 * 1024)
 
     return UploadResponse(
         job_id=job_id,
@@ -185,7 +261,8 @@ async def upload_target_audio(
 @router.get("/validate/{job_id}")
 async def validate_uploaded_audio(
     job_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _auth: str = Depends(verify_api_key)
 ):
     """
     Validate uploaded audio file and get metadata

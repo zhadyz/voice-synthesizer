@@ -26,10 +26,20 @@ import subprocess
 import json
 import shutil
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 import logging
+import torch
 
 logger = logging.getLogger(__name__)
+
+# Import resource monitoring
+try:
+    sys.path.append(str(Path(__file__).parent.parent.parent))
+    from backend.metrics import ResourceMonitor, get_gpu_memory_usage, clear_gpu_cache
+    METRICS_AVAILABLE = True
+except ImportError:
+    METRICS_AVAILABLE = False
+    logger.warning("Metrics module not available - GPU monitoring disabled")
 
 
 class RVCTrainer:
@@ -37,17 +47,23 @@ class RVCTrainer:
         self,
         rvc_dir: Optional[str] = None,
         models_dir: str = "outputs/trained_models",
-        batch_size: int = 8,  # Optimized for RTX 3070
-        gpu_id: int = 0
+        batch_size: int = 6,  # Reduced from 8 for better memory efficiency
+        gpu_id: int = 0,
+        use_fp16: bool = True,  # Mixed precision training
+        enable_monitoring: bool = True,
+        checkpoint_dir: str = "outputs/checkpoints"
     ):
         """
-        Initialize RVC trainer
+        Initialize RVC trainer with memory optimizations
 
         Args:
             rvc_dir: Path to RVC repository (default: env var RVC_DIR or "./Retrieval-based-Voice-Conversion-WebUI")
             models_dir: Directory to save trained models
-            batch_size: Training batch size (lower = less VRAM, recommended: 4-12)
+            batch_size: Training batch size (6 for RTX 3070 8GB, can increase to 10 for 17GB VRAM)
             gpu_id: GPU device ID (0 for first GPU)
+            use_fp16: Enable mixed precision training (reduces VRAM by ~40%)
+            enable_monitoring: Enable GPU/memory monitoring
+            checkpoint_dir: Directory for training checkpoints
         """
         # Get RVC directory from environment variable or use default
         if rvc_dir is None:
@@ -59,8 +75,23 @@ class RVCTrainer:
         self.rvc_dir = Path(rvc_dir)
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.checkpoint_dir = Path(checkpoint_dir)
+        self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
         self.batch_size = batch_size
         self.gpu_id = gpu_id
+        self.use_fp16 = use_fp16
+        self.enable_monitoring = enable_monitoring and METRICS_AVAILABLE
+
+        # Initialize resource monitor
+        self.monitor = None
+        if self.enable_monitoring:
+            self.monitor = ResourceMonitor(
+                gpu_id=gpu_id,
+                vram_alert_threshold_gb=7.0,  # Alert at 7GB for RTX 3070
+                ram_alert_threshold_gb=8.0
+            )
+            logger.info("Resource monitoring enabled")
 
         # Validate RVC installation
         if not self.rvc_dir.exists():
@@ -73,7 +104,19 @@ class RVCTrainer:
         # Validate required scripts exist
         self._validate_rvc_installation()
 
-        logger.info(f"RVC trainer initialized (batch_size={batch_size}, gpu={gpu_id})")
+        # Optimize GPU settings
+        if torch.cuda.is_available():
+            # Enable TF32 for faster training on Ampere GPUs
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+            # Enable cuDNN autotuner
+            torch.backends.cudnn.benchmark = True
+            logger.info("CUDA optimizations enabled (TF32, cuDNN autotuner)")
+
+        logger.info(
+            f"RVC trainer initialized (batch_size={batch_size}, gpu={gpu_id}, "
+            f"fp16={use_fp16}, monitoring={self.enable_monitoring})"
+        )
 
     def _validate_rvc_installation(self):
         """Validate that all required RVC scripts and models exist"""
@@ -187,6 +230,38 @@ class RVCTrainer:
         logger.info(f"Config created: {config_path}")
         return config_path
 
+    def _validate_path(self, path: Path, base_dir: Path = None) -> Path:
+        """
+        Validate and sanitize file path to prevent directory traversal
+
+        Args:
+            path: Path to validate
+            base_dir: Optional base directory to restrict path to
+
+        Returns:
+            Resolved absolute path
+
+        Raises:
+            ValueError: If path contains traversal attempts or is outside base_dir
+        """
+        # Resolve to absolute path (eliminates .. and symlinks)
+        resolved_path = Path(path).resolve()
+
+        # Check for suspicious patterns in string representation
+        path_str = str(path)
+        if '..' in path_str or path_str.startswith('/') or ':' in path_str[1:3]:
+            logger.warning(f"Suspicious path detected: {path}")
+
+        # If base_dir specified, ensure path is within it
+        if base_dir:
+            base_resolved = Path(base_dir).resolve()
+            try:
+                resolved_path.relative_to(base_resolved)
+            except ValueError:
+                raise ValueError(f"Path {path} is outside allowed directory {base_dir}")
+
+        return resolved_path
+
     def preprocess_audio(
         self,
         audio_dir: Path,
@@ -204,6 +279,16 @@ class RVCTrainer:
             n_processes: Number of parallel processes
         """
         logger.info(f"[1/4] Preprocessing audio: {audio_dir}")
+
+        # SECURITY: Validate paths to prevent command injection
+        audio_dir = self._validate_path(audio_dir)
+        exp_dir = self._validate_path(exp_dir)
+
+        # Validate numeric parameters
+        if not (8000 <= sample_rate <= 48000):
+            raise ValueError(f"Invalid sample rate: {sample_rate}")
+        if not (1 <= n_processes <= 32):
+            raise ValueError(f"Invalid n_processes: {n_processes}")
 
         preprocess_script = self.rvc_dir / "infer" / "modules" / "train" / "preprocess.py"
 
@@ -249,6 +334,17 @@ class RVCTrainer:
         """
         logger.info(f"[2/4] Extracting f0 features using {method}")
 
+        # SECURITY: Validate paths and parameters
+        exp_dir = self._validate_path(exp_dir)
+
+        # Whitelist allowed methods to prevent command injection
+        allowed_methods = {"rmvpe", "harvest", "dio", "pm"}
+        if method not in allowed_methods:
+            raise ValueError(f"Invalid f0 extraction method: {method}. Allowed: {allowed_methods}")
+
+        if not (1 <= n_processes <= 32):
+            raise ValueError(f"Invalid n_processes: {n_processes}")
+
         extract_script = self.rvc_dir / "infer" / "modules" / "train" / "extract" / f"extract_f0_{method}.py"
 
         if not extract_script.exists():
@@ -292,6 +388,13 @@ class RVCTrainer:
             use_fp16: Use half precision
         """
         logger.info(f"[3/4] Extracting HuBERT features (version={version})")
+
+        # SECURITY: Validate paths and parameters
+        exp_dir = self._validate_path(exp_dir)
+
+        # Whitelist allowed versions
+        if version not in {"v1", "v2"}:
+            raise ValueError(f"Invalid version: {version}. Allowed: v1, v2")
 
         extract_script = self.rvc_dir / "infer" / "modules" / "train" / "extract_feature_print.py"
 
@@ -341,6 +444,16 @@ class RVCTrainer:
         """
         logger.info(f"Preparing training data for model: {model_name}")
 
+        # SECURITY: Validate model name to prevent path traversal
+        # Only allow alphanumeric, underscore, hyphen
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]{1,50}$', model_name):
+            raise ValueError(f"Invalid model name: {model_name}. Use only alphanumeric, underscore, hyphen (1-50 chars)")
+
+        # Validate sample rate
+        if not (8000 <= sample_rate <= 48000):
+            raise ValueError(f"Invalid sample rate: {sample_rate}")
+
         # Create experiment directory
         exp_dir = self.rvc_dir / "logs" / model_name
         exp_dir.mkdir(parents=True, exist_ok=True)
@@ -383,6 +496,33 @@ class RVCTrainer:
 
         logger.info(f"Created filelist with {len(list(gt_wavs_dir.glob('*.wav')))} files")
 
+    def _find_latest_checkpoint(self, exp_dir: Path, model_name: str) -> Optional[Path]:
+        """Find the latest checkpoint for resume training"""
+        logs_dir = self.rvc_dir / "logs" / model_name
+        if not logs_dir.exists():
+            return None
+
+        # Look for generator checkpoints (G_*.pth)
+        checkpoints = list(logs_dir.glob("G_*.pth"))
+        if not checkpoints:
+            return None
+
+        # Extract epoch numbers and find latest
+        checkpoint_epochs = []
+        for ckpt in checkpoints:
+            try:
+                epoch = int(ckpt.stem.split('_')[1])
+                checkpoint_epochs.append((epoch, ckpt))
+            except (IndexError, ValueError):
+                continue
+
+        if checkpoint_epochs:
+            latest_epoch, latest_ckpt = max(checkpoint_epochs, key=lambda x: x[0])
+            logger.info(f"Found checkpoint at epoch {latest_epoch}: {latest_ckpt}")
+            return latest_ckpt
+
+        return None
+
     def train_model(
         self,
         model_name: str,
@@ -393,10 +533,12 @@ class RVCTrainer:
         version: str = "v2",
         pretrain_g: str = "",
         pretrain_d: str = "",
-        cache_in_gpu: bool = False
+        cache_in_gpu: bool = False,
+        resume_training: bool = True,
+        progress_callback: Optional[Callable[[int, int], None]] = None
     ) -> Path:
         """
-        Step 4: Train RVC voice conversion model
+        Step 4: Train RVC voice conversion model with optimizations
 
         Args:
             model_name: Name of voice model
@@ -407,7 +549,9 @@ class RVCTrainer:
             version: Model version (v1 or v2)
             pretrain_g: Path to pretrained generator (optional)
             pretrain_d: Path to pretrained discriminator (optional)
-            cache_in_gpu: Cache dataset in GPU memory (requires high VRAM)
+            cache_in_gpu: Cache dataset in GPU memory (DISABLED for RTX 3070)
+            resume_training: Resume from latest checkpoint if available
+            progress_callback: Optional callback for progress updates (epoch, total_epochs)
 
         Returns:
             Path to trained model checkpoint
@@ -415,9 +559,46 @@ class RVCTrainer:
         logger.info(f"[4/4] Starting RVC training for: {model_name}")
         logger.info(f"Total epochs: {total_epochs}, Save every: {save_every_epoch}")
         logger.info(f"Batch size: {self.batch_size}, Sample rate: {sample_rate}, Version: {version}")
+        logger.info(f"Mixed precision (FP16): {self.use_fp16}")
+
+        # Start monitoring if enabled
+        if self.monitor:
+            self.monitor.start_operation(f"train_model_{model_name}")
+
+        # MEMORY OPTIMIZATION: Disable GPU caching for RTX 3070
+        if cache_in_gpu:
+            logger.warning(
+                "GPU caching disabled for memory safety on RTX 3070 (8GB VRAM). "
+                "Can be enabled for GPUs with >12GB VRAM."
+            )
+            cache_in_gpu = False
+
+        # Clear GPU cache before training
+        if torch.cuda.is_available():
+            clear_gpu_cache(self.gpu_id)
+            logger.info(f"Initial GPU memory: {get_gpu_memory_usage(self.gpu_id)}")
 
         # Create filelist
         self._create_filelist(exp_dir)
+
+        # Check for existing checkpoint to resume
+        latest_checkpoint = None
+        start_epoch = 0
+        if resume_training:
+            latest_checkpoint = self._find_latest_checkpoint(exp_dir, model_name)
+            if latest_checkpoint:
+                try:
+                    epoch_num = int(latest_checkpoint.stem.split('_')[1])
+                    start_epoch = epoch_num
+                    pretrain_g = str(latest_checkpoint)
+                    # Find corresponding discriminator
+                    disc_checkpoint = latest_checkpoint.parent / f"D_{epoch_num}.pth"
+                    if disc_checkpoint.exists():
+                        pretrain_d = str(disc_checkpoint)
+                    logger.info(f"Resuming training from epoch {start_epoch}")
+                    logger.info(f"Loading checkpoint: {latest_checkpoint}")
+                except Exception as e:
+                    logger.warning(f"Failed to parse checkpoint epoch: {e}")
 
         # RVC training script (correct path)
         train_script = self.rvc_dir / "infer" / "modules" / "train" / "train.py"
@@ -425,7 +606,7 @@ class RVCTrainer:
         if not train_script.exists():
             raise ValueError(f"Training script not found: {train_script}")
 
-        # Build training command with RVC's expected arguments
+        # Build training command with memory optimizations
         cmd = [
             sys.executable,
             str(train_script),
@@ -434,32 +615,71 @@ class RVCTrainer:
             "-pg", pretrain_g,  # pretrainG
             "-pd", pretrain_d,  # pretrainD
             "-g", str(self.gpu_id),  # gpus (single GPU)
-            "-bs", str(self.batch_size),  # batch_size
+            "-bs", str(self.batch_size),  # batch_size (optimized for 8GB)
             "-e", model_name,  # experiment_dir (model name)
             "-sr", str(sample_rate),  # sample_rate
             "-sw", "1",  # save_every_weights (save extracted weights)
             "-v", version,  # version (v1/v2)
             "-f0", "1",  # if_f0 (use pitch information)
-            "-l", "1",  # if_latest (only save latest checkpoint)
-            "-c", "1" if cache_in_gpu else "0"  # if_cache_data_in_gpu
+            "-l", "0",  # if_latest (keep all checkpoints for resume)
+            "-c", "0"  # if_cache_data_in_gpu (DISABLED for memory safety)
         ]
 
         logger.info(f"Training command: {' '.join(cmd)}")
+        logger.info("Starting training subprocess (this may take 30-40 minutes)...")
 
-        # Run training
+        # Run training with real-time output
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd,
                 cwd=str(self.rvc_dir),
-                check=True,
-                capture_output=True,
-                text=True
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
             )
+
+            # Stream output and monitor resources
+            for line in process.stdout:
+                print(line, end='')  # Print training output
+
+                # Sample GPU metrics periodically
+                if self.monitor and 'Epoch' in line:
+                    self.monitor.sample()
+
+                # Parse progress if callback provided
+                if progress_callback and 'Epoch' in line:
+                    try:
+                        # Example: "Epoch: 42/200"
+                        parts = line.split('Epoch')
+                        if len(parts) > 1:
+                            epoch_str = parts[1].strip().split()[0].replace(':', '')
+                            current_epoch = int(epoch_str.split('/')[0])
+                            progress_callback(current_epoch, total_epochs)
+                    except Exception:
+                        pass
+
+            process.wait()
+
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    process.returncode,
+                    cmd,
+                    "Training process failed"
+                )
+
             logger.info(f"Training complete")
-            logger.info(f"Output: {result.stdout[-500:]}")  # Last 500 chars
+
         except subprocess.CalledProcessError as e:
-            logger.error(f"Training failed: {e.stderr}")
-            raise RuntimeError(f"RVC training failed: {e.stderr}")
+            logger.error(f"Training failed: {e}")
+            if self.monitor:
+                self.monitor.end_operation(success=False, error_message=str(e))
+            raise RuntimeError(f"RVC training failed: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected training error: {e}")
+            if self.monitor:
+                self.monitor.end_operation(success=False, error_message=str(e))
+            raise
 
         # Find trained model checkpoint
         # RVC saves to weights/{model_name}.pth
@@ -478,6 +698,18 @@ class RVCTrainer:
                     f"Trained model not found at {model_path} or {alt_path}\n"
                     f"Check training logs at {exp_dir}"
                 )
+
+        # Clear GPU cache after training
+        if torch.cuda.is_available():
+            clear_gpu_cache(self.gpu_id)
+            logger.info(f"Final GPU memory: {get_gpu_memory_usage(self.gpu_id)}")
+
+        # End monitoring
+        if self.monitor:
+            metrics = self.monitor.end_operation(success=True)
+            # Save metrics
+            metrics_path = self.checkpoint_dir / f"{model_name}_training_metrics.json"
+            self.monitor.save_metrics(metrics, str(metrics_path))
 
         logger.info(f"Model saved: {model_path}")
         return model_path

@@ -15,13 +15,13 @@ export function WaveformPlayer({ audioUrl, title }) {
     // Create WaveSurfer instance
     wavesurfer.current = WaveSurfer.create({
       container: waveformRef.current,
-      waveColor: '#ddd',
-      progressColor: '#6366f1',
-      cursorColor: '#6366f1',
-      barWidth: 2,
+      waveColor: '#E5E7EB',
+      progressColor: '#3B82F6',
+      cursorColor: '#2563EB',
+      barWidth: 3,
       barRadius: 3,
       responsive: true,
-      height: 80,
+      height: 100,
       normalize: true,
     });
 
@@ -56,16 +56,16 @@ export function WaveformPlayer({ audioUrl, title }) {
   };
 
   return (
-    <div className="bg-white rounded-lg p-4 shadow">
-      <div className="flex items-center gap-4 mb-2">
+    <div className="bg-white rounded-2xl p-8 shadow-elevated hover:shadow-xl transition-shadow duration-300">
+      <div className="flex items-center gap-5 mb-6">
         <button
           onClick={togglePlay}
           disabled={isLoading}
-          className="w-12 h-12 flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-r from-accent-500 to-accent-600 text-white shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
           {isLoading ? (
             <svg
-              className="animate-spin h-6 w-6"
+              className="animate-spin h-7 w-7"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -86,7 +86,7 @@ export function WaveformPlayer({ audioUrl, title }) {
             </svg>
           ) : isPlaying ? (
             <svg
-              className="w-6 h-6"
+              className="w-7 h-7"
               fill="currentColor"
               viewBox="0 0 24 24"
               xmlns="http://www.w3.org/2000/svg"
@@ -95,7 +95,7 @@ export function WaveformPlayer({ audioUrl, title }) {
             </svg>
           ) : (
             <svg
-              className="w-6 h-6 ml-1"
+              className="w-7 h-7 ml-1"
               fill="currentColor"
               viewBox="0 0 24 24"
               xmlns="http://www.w3.org/2000/svg"
@@ -104,9 +104,9 @@ export function WaveformPlayer({ audioUrl, title }) {
             </svg>
           )}
         </button>
-        <span className="font-medium text-gray-700">{title}</span>
+        <span className="text-lg font-semibold text-gray-900">{title}</span>
       </div>
-      <div ref={waveformRef} />
+      <div ref={waveformRef} className="rounded-lg overflow-hidden" />
     </div>
   );
 }

@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
+from arq import create_pool
+from arq.connections import RedisSettings
+import logging
 
 from backend.database import get_db
 from backend.models import Job, JobStatus, VoiceModel
@@ -16,8 +19,12 @@ from backend.schemas import (
     TrainingStartRequest,
     ConversionStartRequest
 )
+from backend.config import settings
+from backend.auth import verify_api_key
 
-router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(verify_api_key)])
 
 
 @router.post("/train", response_model=JobResponse)
@@ -51,9 +58,33 @@ async def start_training(
     job.updated_at = datetime.utcnow()
     db.commit()
 
-    # TODO: Enqueue ARQ job when worker is ready
-    # redis = await create_pool(RedisSettings())
-    # await redis.enqueue_job('preprocess_audio', job.id, job.input_audio_path, job.user_id)
+    # Enqueue ARQ job
+    try:
+        redis_settings = RedisSettings(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            database=settings.REDIS_DB,
+            password=settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None
+        )
+        pool = await create_pool(redis_settings)
+        job_result = await pool.enqueue_job(
+            'preprocess_audio',
+            job.id,
+            job.input_audio_path,
+            job.user_id
+        )
+        await pool.close()
+
+        logger.info(f"Enqueued preprocessing job {job.id}, ARQ job ID: {job_result.job_id}")
+    except Exception as e:
+        logger.error(f"Failed to enqueue job {job.id}: {e}")
+        job.status = JobStatus.FAILED
+        job.error_message = "Failed to enqueue job. Is Redis running?"
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to enqueue job. Please contact system administrator."
+        )
 
     return JobResponse.model_validate(job)
 
@@ -95,9 +126,34 @@ async def start_conversion(
     job.updated_at = datetime.utcnow()
     db.commit()
 
-    # TODO: Enqueue ARQ job when worker is ready
-    # redis = await create_pool(RedisSettings())
-    # await redis.enqueue_job('convert_voice', job.id, model.model_path, job.input_audio_path, request.output_name)
+    # Enqueue ARQ job
+    try:
+        redis_settings = RedisSettings(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            database=settings.REDIS_DB,
+            password=settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None
+        )
+        pool = await create_pool(redis_settings)
+        job_result = await pool.enqueue_job(
+            'convert_voice',
+            job.id,
+            model.model_path,
+            job.input_audio_path,
+            request.output_name
+        )
+        await pool.close()
+
+        logger.info(f"Enqueued conversion job {job.id}, ARQ job ID: {job_result.job_id}")
+    except Exception as e:
+        logger.error(f"Failed to enqueue job {job.id}: {e}")
+        job.status = JobStatus.FAILED
+        job.error_message = "Failed to enqueue job. Is Redis running?"
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to enqueue job. Please contact system administrator."
+        )
 
     return JobResponse.model_validate(job)
 

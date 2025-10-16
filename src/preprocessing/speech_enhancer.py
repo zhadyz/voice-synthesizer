@@ -149,6 +149,51 @@ class SpeechEnhancer:
 
         return output_path
 
+    def batch_extract_clean_speech(
+        self,
+        audio_paths: list,
+        output_dir: str,
+        apply_denoising: bool = True
+    ) -> list:
+        """
+        Extract clean speech from multiple audio files in batch
+
+        Args:
+            audio_paths: List of input audio files
+            output_dir: Output directory for clean audio
+            apply_denoising: Whether to apply denoising
+
+        Returns:
+            List of output file paths
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Batch processing {len(audio_paths)} audio files")
+        results = []
+
+        for i, audio_path in enumerate(audio_paths):
+            try:
+                input_path = Path(audio_path)
+                output_path = output_dir / f"{input_path.stem}_clean.wav"
+
+                logger.info(f"Processing {i+1}/{len(audio_paths)}: {audio_path}")
+
+                clean_path = self.extract_clean_speech(
+                    audio_path,
+                    str(output_path),
+                    apply_denoising=apply_denoising
+                )
+                results.append(clean_path)
+
+            except Exception as e:
+                logger.error(f"Failed to process {audio_path}: {e}")
+                results.append(None)
+
+        success_count = sum(1 for r in results if r is not None)
+        logger.info(f"Batch processing complete: {success_count}/{len(audio_paths)} succeeded")
+        return results
+
 
 # Test script
 if __name__ == "__main__":

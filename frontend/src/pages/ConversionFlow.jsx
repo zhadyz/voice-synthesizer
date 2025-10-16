@@ -31,31 +31,27 @@ export function ConversionFlow() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-2 text-gray-900">Convert Audio to Your Voice</h1>
-      <p className="text-gray-600 mb-8">
-        Upload any audio (song, speech, etc.) to convert it to your trained voice
-      </p>
+    <div className="max-w-5xl mx-auto px-8">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-bold mb-3 text-gray-900">Convert Audio to Your Voice</h1>
+        <p className="text-lg text-gray-600">
+          Upload any audio (song, speech, etc.) to convert it to your trained voice
+        </p>
+      </div>
 
       {/* Model Info Card */}
       {trainedModel && (
-        <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <svg
-              className="w-5 h-5 text-green-500 mr-2"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
+        <div className="mb-8 bg-green-50 border-2 border-green-200 rounded-xl p-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
             <div>
-              <p className="text-sm font-medium text-green-800">
-                Using model: <strong>{trainedModel.model_name || trainedModel.name || 'Trained Model'}</strong>
+              <p className="text-sm font-medium text-green-700 mb-1">Using trained model</p>
+              <p className="text-lg font-bold text-green-900">
+                {trainedModel.model_name || trainedModel.name || 'Trained Model'}
               </p>
             </div>
           </div>
@@ -64,12 +60,12 @@ export function ConversionFlow() {
 
       {/* Upload Target Audio */}
       {currentStep === 'upload-target' && (
-        <div className="space-y-6">
+        <div className="space-y-8 animate-fadeIn">
           {isUploading ? (
-            <div className="bg-white rounded-lg p-8 shadow">
+            <div className="bg-white rounded-2xl p-12 shadow-elevated">
               <div className="flex flex-col items-center justify-center">
                 <svg
-                  className="animate-spin h-12 w-12 text-primary mb-4"
+                  className="animate-spin h-16 w-16 text-accent-500 mb-6"
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -88,7 +84,7 @@ export function ConversionFlow() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                <p className="text-gray-600">Uploading and starting conversion...</p>
+                <p className="text-lg text-gray-700 font-medium">Uploading and starting conversion...</p>
               </div>
             </div>
           ) : (
@@ -98,11 +94,16 @@ export function ConversionFlow() {
                 label="Upload Audio to Convert (e.g., song, speech)"
               />
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-700">
-                  <strong>Tip:</strong> For best results, upload clear audio without heavy background music.
-                  The conversion typically takes 2-5 minutes depending on audio length.
-                </p>
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+                <div className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-blue-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm text-blue-700 leading-relaxed">
+                    <strong>Tip:</strong> For best results, upload clear audio without heavy background music.
+                    The conversion typically takes 2-5 minutes depending on audio length.
+                  </p>
+                </div>
               </div>
             </>
           )}
@@ -111,22 +112,39 @@ export function ConversionFlow() {
 
       {/* Conversion Progress */}
       {currentStep === 'converting' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg p-8 shadow">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">Converting Audio</h2>
+        <div className="space-y-8 animate-fadeIn">
+          <div className="bg-white rounded-2xl p-10 shadow-elevated">
+            <h2 className="text-2xl font-bold mb-6 text-gray-900">Converting Audio</h2>
             <ProgressBar
               progress={progress}
               status={jobStatus}
               message="Converting target audio to your voice..."
             />
 
-            <div className="mt-6 bg-gray-50 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Processing Steps</h3>
-              <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-                <li>Separating vocals from background music (if present)</li>
-                <li>Extracting voice features from target audio</li>
-                <li>Applying your trained voice model</li>
-                <li>Generating final output with your voice</li>
+            <div className="mt-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+              <h3 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                </svg>
+                Processing Steps
+              </h3>
+              <ul className="text-sm text-gray-700 space-y-2">
+                <li className="flex items-start gap-3">
+                  <span className="text-accent-500 mt-0.5">•</span>
+                  <span>Separating vocals from background music (if present)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-accent-500 mt-0.5">•</span>
+                  <span>Extracting voice features from target audio</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-accent-500 mt-0.5">•</span>
+                  <span>Applying your trained voice model</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="text-accent-500 mt-0.5">•</span>
+                  <span>Generating final output with your voice</span>
+                </li>
               </ul>
             </div>
           </div>
@@ -135,25 +153,16 @@ export function ConversionFlow() {
 
       {/* Conversion Complete */}
       {currentStep === 'complete' && convertedAudioUrl && (
-        <div className="space-y-6">
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <svg
-                className="w-6 h-6 text-green-500 mr-2"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                  clipRule="evenodd"
-                />
+        <div className="space-y-8 animate-fadeIn">
+          {/* Success Banner */}
+          <div className="text-center py-12">
+            <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg animate-bounce-soft">
+              <svg className="w-14 h-14 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <p className="text-green-700 font-medium">
-                Conversion complete! Listen to your result below.
-              </p>
             </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Conversion Complete!</h2>
+            <p className="text-lg text-gray-600">Your synthesized audio is ready</p>
           </div>
 
           <WaveformPlayer
@@ -164,14 +173,19 @@ export function ConversionFlow() {
           <a
             href={convertedAudioUrl}
             download="converted_audio.wav"
-            className="block w-full bg-primary text-white text-center py-3 rounded-lg font-medium hover:bg-primary/90 transition"
+            className="block w-full px-6 py-4 bg-gradient-to-r from-accent-500 to-accent-600 text-white text-center font-semibold rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
           >
             Download Converted Audio
           </a>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">What's Next?</h3>
-            <p className="text-sm text-gray-600">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <svg className="w-5 h-5 text-accent-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              What's Next?
+            </h3>
+            <p className="text-sm text-gray-700 leading-relaxed">
               Want to convert another audio file? Click "Start Over" at the top to begin a new conversion,
               or train a new voice model for different voices.
             </p>
@@ -181,10 +195,10 @@ export function ConversionFlow() {
 
       {/* Error Display */}
       {error && (
-        <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
-          <div className="flex items-start">
+        <div className="mt-8 bg-red-50 border-2 border-red-200 rounded-xl p-6 animate-fadeIn">
+          <div className="flex items-start gap-4">
             <svg
-              className="w-5 h-5 text-red-400 mt-0.5 mr-3"
+              className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5"
               fill="currentColor"
               viewBox="0 0 20 20"
               xmlns="http://www.w3.org/2000/svg"
@@ -196,8 +210,8 @@ export function ConversionFlow() {
               />
             </svg>
             <div>
-              <h3 className="text-sm font-medium text-red-800">Error</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
+              <h3 className="text-base font-bold text-red-900 mb-1">Error</h3>
+              <p className="text-sm text-red-700 leading-relaxed">{error}</p>
             </div>
           </div>
         </div>
