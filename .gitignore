@@ -75,8 +75,8 @@ pipeline_outputs/
 !tests/fixtures/*.wav
 !tests/fixtures/*.mp3
 
-# Agent memory reports (internal only)
-.claude/memory/agent_reports/*.json
+# Claude Code internal files (not needed for production)
+.claude/
 
 # Model files (large)
 pretrained/
