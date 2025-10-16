@@ -66,12 +66,17 @@ dump.rdb
 uploads/
 outputs/
 test_audio/
+data/
+pipeline_outputs/
 *.wav
 *.mp3
 *.m4a
 *.flac
 !tests/fixtures/*.wav
 !tests/fixtures/*.mp3
+
+# Agent memory reports (internal only)
+.claude/memory/agent_reports/*.json
 
 # Model files (large)
 pretrained/
